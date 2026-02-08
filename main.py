@@ -8,7 +8,7 @@ app = Flask(__name__)
 def home(): return "Bot is Online!", 200
 
 # لێرەدا زانیارییەکانت بنووسە
-TOKEN = 8444430154:AAGeGDuMDaXwMcWla30uDmYYqnRCBPFe0NA
+TOKEN = "8444430154:AAGeGDuMDaXwMcWla30uDmYYqnRCBPFe0NA"
 OWNER_ID = 1102319741# لێرە ئایدی خۆت دابنێ
 
 async def handle_link(update: Update, context):
