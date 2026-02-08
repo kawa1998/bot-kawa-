@@ -24,7 +24,7 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("ڤیدیۆ 🎬", callback_data=f"vid|{url}"),
              InlineKeyboardButton("دەنگ 🎵", callback_data=f"aud|{url}")]
         ])
-        await update.message.reply_text("تکایە هەڵبژێرە:", reply_markup=kb)
+        await update.message.reply_text("هەڵبژێرە:", reply_markup=kb)
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
