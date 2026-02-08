@@ -20,9 +20,12 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         res = requests.head(url, allow_redirects=True, timeout=10)
         url = res.url
     except: pass
-    kb = [[InlineKeyboardButton("ڤیدیۆ 🎬", callback_data=f"v|{url}"),
-           InlineKeyboardButton("دەنگ 🎵", callback_data=f"a|{url}")]]
-    await update.message.reply_text("جۆرەکە هەڵبژێرە:", reply_markup=InlineKeyboardMarkup(kb))
+            kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("ڤیدیۆ 🎬", callback_data=f"vid|{url}"),
+             InlineKeyboardButton("دەنگ 🎵", callback_data=f"aud|{url}")]
+        ])
+        await update.message.reply_text("تکایە هەڵبژێرە:", reply_markup=kb)
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
