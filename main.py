@@ -1,69 +1,71 @@
-import os, threading, yt_dlp
+import os, subprocess, threading, asyncio
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters
 
-# ١. ڕێکخستنی سێرڤەری وێب بۆ مانەوەی بۆتەکە بە زیندوویی لە Koyeb
+# ڕێکخستنی Flask بۆ سێرڤەری Koyeb
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Bot is Online!", 200
+def home(): return "Advanced Python Terminal is Running!", 200
 
-# ٢. زانیارییە تایبەتەکانی بۆتەکە (تۆکن و ئایدی خۆت لێرە دابنێ)
-TOKEN = "8444430154:AAH6ZGD94WssDR5eL4IpNTnWrWXHvrcCSh0" # تۆکنە نوێیەکە لێرە دابنێ
-OWNER_ID = 1102319741 # ئایدی خۆت لێرە دابنێ
+# زانیارییەکانت لێرە دابنێ
+TOKEN = "8444430154:AAH6ZGD94WssDR5eL4IpNTnWrWXHvrcCSh0"
+OWNER_ID =1102319741
 
-# ٣. فەرمانی وەرگرتنی لینک و نیشاندانی دوگمەکان
-async def handle_message(update: Update, context):
-    if update.message.from_user.id != OWNER_ID: return
-    url = update.message.text
-    if "http" in url:
-        kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("ڤیدیۆ 🎬", callback_data=f"vid|{url}"),
-            InlineKeyboardButton("دەنگ 🎵", callback_data=f"aud|{url}")
-        ]])
-        await update.message.reply_text("📥 لینکەکە وەرگیرا، جۆرەکە هەڵبژێرە:", reply_markup=kb)
+async def execute_command(update: Update, context):
+    if update.message.from_user.id != OWNER_ID:
+        return
 
-# ٤. فەرمانی داگرتن و ناردنی فایلەکە (چارەسەری کێشەی یوتیوب لێرەدایە)
-async def button_callback(update: Update, context):
-    query = update.callback_query
-    await query.answer("خەریکی داگرتنم... ⏳")
-    data, url = query.data.split("|")
-    
-    ydl_opts = {
-        'format': 'best' if data == 'vid' else 'bestaudio/best',
-        'outtmpl': 'downloaded_file.%(ext)s',
-        'quiet': True,
-        'no_warnings': True,
-        # بەکارهێنانی فێڵێک بۆ تێپەڕاندنی ڕێگرییەکانی یوتیوب
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-    
+    command = update.message.text
+    # ناردنی پەیامێکی کاتی تا فەرمانەکە تەواو دەبێت
+    status_msg = await update.message.reply_text("⏳ خەریکی جێبەجێکردنە...")
+
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
+        # بەکارهێنانی subprocess بۆ کارپێکردنی فەرمانەکان بە کاتی دیاریکراو (Timeout)
+        process = subprocess.Popen(
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         
-        with open(filename, 'rb') as f:
-            if data == 'vid':
-                await query.message.reply_video(video=f, caption="فەرموو ڤیدیۆکەت ✨")
+        # ڕێگە دەگرێت لەوەی فەرمانەکە سێرڤەرەکە بۆ هەمیشە سەرقاڵ بکات
+        try:
+            stdout, stderr = process.communicate(timeout=60) 
+        except subprocess.TimeoutExpired:
+            process.kill()
+            await status_msg.edit_text("❌ کاتەکە کۆتایی هات (Timeout). فەرمانەکە زۆر درێژەی کێشا.")
+            return
+
+        # کۆکردنەوەی ئەنجامەکان
+        output = stdout if stdout else ""
+        errors = stderr if stderr else ""
+        full_response = output + errors
+
+        if not full_response.strip():
+            await status_msg.edit_text("✅ فەرمانەکە بە سەرکەوتوویی جێبەجێ کرا (هیچ دەرئەنجامێکی نەبوو).")
+        else:
+            # ناردنی ئەنجام بە شێوازی کۆد بۆ ئەوەی ئاسان کۆپی بکرێت
+            if len(full_response) > 4000:
+                # ئەگەر ئەنجامەکە زۆر درێژ بوو، وەک فایل دەینێرێت
+                with open("output.txt", "w") as f:
+                    f.write(full_response)
+                await update.message.reply_document(document=open("output.txt", "rb"), caption="📄 ئەنجامەکە زۆر درێژ بوو، وەک فایل نێردرا.")
+                os.remove("output.txt")
+                await status_msg.delete()
             else:
-                await query.message.reply_audio(audio=f, caption="فەرموو دەنگەکە ✨")
-        os.remove(filename) # سڕینەوەی فایلەکە لە سێرڤەر دوای ناردن
+                await status_msg.edit_text(f"```bash\n{full_response}\n```", parse_mode='MarkdownV2')
+
     except Exception as e:
-        await query.message.reply_text(f"❌ هەڵەیەک ڕوویدا: {e}")
+        await status_msg.edit_text(f"❌ هەڵەیەک ڕوویدا:\n`{str(e)}`", parse_mode='MarkdownV2')
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
-# ٥. دەستپێکردنی هەموو بەشەکان بەیەکەوە
 if __name__ == '__main__':
-    # کارپێکردنی سێرڤەری Flask لە پشتەوە
+    # دەستپێکردنی Flask لە تێردێکی جیاواز
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # کارپێکردنی بۆتی تیلیگرام
+    # دەستپێکردنی بۆتەکە بە شێوازێکی پێشکەوتوو
     application = Application.builder().token(TOKEN).build()
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(button_callback))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, execute_command))
     
-    print("Bot is starting perfectly...")
+    print("Advanced Bot is starting...")
     application.run_polling(drop_pending_updates=True)
